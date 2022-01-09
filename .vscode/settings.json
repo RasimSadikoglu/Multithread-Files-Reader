@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "dirent.h": "c",
+        "pthread.h": "c",
+        "errno.h": "c"
+    },
+    "workbench.editor.enablePreview": false
+}
