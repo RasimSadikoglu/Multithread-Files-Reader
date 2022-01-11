@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <semaphore.h>
 
 typedef struct {
     pthread_mutex_t m_edit;
