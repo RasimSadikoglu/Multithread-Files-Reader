@@ -8,8 +8,10 @@
 #include <semaphore.h>
 
 typedef struct {
+    pthread_mutex_t m_edit;
     char *word;
-    char *file;
+    char **files;
+    int number_of_files;
 } word_set;
 
 word_set **unique_words;
@@ -65,6 +67,7 @@ int main(int argc, char *argv[]) {
     /**/
 
     for (int i = 0; i < unique_words_index; i++) {
+        free(unique_words[i]->files);
         free(unique_words[i]->word);
         free(unique_words[i]);
     }
@@ -147,7 +150,12 @@ void* read_file(void *file_name) {
 
             word_set *unique_word = malloc(sizeof(word_set));
 
-            unique_word->file = file_name;
+            pthread_mutex_init(&(unique_word->m_edit), NULL);
+            
+            unique_word->files = malloc(sizeof(char*));
+            unique_word->files[0] = file_name;
+            unique_word->number_of_files = 1;
+            
             unique_word->word = malloc(strlen(buffer) + 1);
             strcpy(unique_word->word, buffer);
 
@@ -168,6 +176,13 @@ void* read_file(void *file_name) {
             printf("Thread %lu: Added '%s' at index %d.\n", (unsigned long)pthread_self(), buffer, write_index);
         } else {
             printf("Thread %lu: The word '%s' has already located at index %d.\n", (unsigned long)pthread_self(), buffer, index);
+
+            pthread_mutex_lock(&(unique_words[index]->m_edit));
+
+            unique_words[index]->files = realloc(unique_words[index]->files, sizeof(char*) * (unique_words[index]->number_of_files + 1));
+            unique_words[index]->files[unique_words[index]->number_of_files++] = file_name;
+
+            pthread_mutex_unlock(&(unique_words[index]->m_edit));
         }
 
     }
