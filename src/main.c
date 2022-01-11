@@ -39,9 +39,7 @@ int main(int argc, char *argv[]) {
     
     char **file_names = get_file_names(directory_name);
     int number_of_files = 0;
-
-    /**/
-
+    
     unique_words_size = 1 << 3;
     unique_words = malloc(sizeof(word_set*) * unique_words_size);
     printf("Main Thread: Allocated initial array of %d pointers.\n", unique_words_size);
@@ -63,8 +61,6 @@ int main(int argc, char *argv[]) {
         }
 
     }
-
-    /**/
 
     for (int i = 0; i < unique_words_index; i++) {
         free(unique_words[i]->files);
