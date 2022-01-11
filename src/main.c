@@ -15,10 +15,13 @@ typedef struct {
 word_set **unique_words;
 int unique_words_size;
 int unique_words_index;
-
 pthread_mutex_t m_write_index = PTHREAD_MUTEX_INITIALIZER;
 
-char** get_file_names(char*);
+char **file_names;
+int file_names_index;
+pthread_mutex_t m_file_index = PTHREAD_MUTEX_INITIALIZER;
+
+void get_file_names(char*);
 
 void* read_file(void*);
 
@@ -35,10 +38,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     
-    char **file_names = get_file_names(directory_name);
-    int number_of_files = 0;
-
-    /**/
+    get_file_names(directory_name);
+    file_names_index = 0;
 
     unique_words_size = 1 << 3;
     unique_words = malloc(sizeof(word_set*) * unique_words_size);
@@ -46,23 +47,13 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread_pool[number_of_threads];
 
-    while (file_names[number_of_files] != NULL) {
-
-        for (int i = 0; i < number_of_threads && file_names[number_of_files] != NULL; i++) {
-            pthread_create(thread_pool + i, NULL, read_file, file_names[number_of_files]);
-            printf("Main Thread: Assigned '%s' to worker thread %lu\n", file_names[number_of_files], (unsigned long)thread_pool[i]);
-            number_of_files++;
-        }
-
-        int number_of_threads_working = number_of_files % number_of_threads == 0 ? number_of_threads : number_of_files % number_of_threads;
-
-        for (int i = 0; i < number_of_threads_working; i++) {
-            pthread_join(thread_pool[i], NULL);
-        }
-
+    for (int i = 0; i < number_of_threads; i++) {
+        pthread_create(thread_pool + i, NULL, read_file, NULL);
     }
 
-    /**/
+    for (int i = 0; i < number_of_threads; i++) {
+        pthread_join(thread_pool[i], NULL);
+    }
 
     for (int i = 0; i < unique_words_index; i++) {
         free(unique_words[i]->word);
@@ -75,9 +66,9 @@ int main(int argc, char *argv[]) {
     free(file_names);
 }
 
-char** get_file_names(char *directory_name) {
-    char **file_names = calloc(sizeof(char*), 1);
-    size_t index = 0;
+void get_file_names(char *directory_name) {
+    file_names = calloc(sizeof(char*), 1);
+    file_names_index = 0;
 
     DIR *directory = opendir(directory_name);
 
@@ -94,17 +85,15 @@ char** get_file_names(char *directory_name) {
 
         size_t file_name_size = strlen(directory_name) + strlen(directory_entry->d_name) + 2;
 
-        file_names[index] = malloc(file_name_size);
-        sprintf(file_names[index], "%s/%s", directory_name, directory_entry->d_name);
-        index++;
+        file_names[file_names_index] = malloc(file_name_size);
+        sprintf(file_names[file_names_index], "%s/%s", directory_name, directory_entry->d_name);
+        file_names_index++;
 
-        file_names = realloc(file_names, sizeof(char*) * (index + 1));
-        file_names[index] = NULL;
+        file_names = realloc(file_names, sizeof(char*) * (file_names_index + 1));
+        file_names[file_names_index] = NULL;
     }
 
     closedir(directory);
-
-    return file_names;
 }
 
 char* read_file_content(char *file_name) {
@@ -134,13 +123,27 @@ int check_for_word(char *word) {
     return -1;
 }
 
-void* read_file(void *file_name) {
+void* read_file(void *arg) {
+
+    char *file_name;
+
+    pthread_mutex_lock(&m_file_index);
+
+    if (file_names[file_names_index] == NULL) {
+        pthread_mutex_unlock(&m_file_index);
+        pthread_exit(NULL);
+    }
+    else file_name = file_names[file_names_index++];
+
+    pthread_mutex_unlock(&m_file_index);
+    
+    printf("Thread %lu: Started processing file '%s'.\n", (unsigned long)pthread_self(), file_name);
 
     char *file_content = read_file_content(file_name);
 
     char *buffer, *next = file_content;
 
-    while ((buffer = strtok_r(next, " ", &next)) != NULL) {
+    while ((buffer = strtok_r(next, " \n", &next)) != NULL) {
         int index = check_for_word(buffer);
 
         if (index == -1) {
@@ -173,6 +176,8 @@ void* read_file(void *file_name) {
     }
 
     free(file_content);
+
+    read_file(NULL);
 
     pthread_exit(NULL);
 }
