@@ -64,6 +64,13 @@ int main(int argc, char *argv[]) {
 
     /**/
 
+    for (int i = 0; i < unique_words_index; i++) {
+        free(unique_words[i]->word);
+        free(unique_words[i]);
+    }
+    
+    free(unique_words);
+
     for (int i = 0; file_names[i] != NULL; i++) free(file_names[i]);
     free(file_names);
 }
