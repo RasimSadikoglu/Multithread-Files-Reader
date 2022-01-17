@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <semaphore.h>
 
 typedef struct {
     pthread_mutex_t m_edit;
@@ -23,9 +22,12 @@ char **file_names;
 int file_names_index;
 pthread_mutex_t m_file_index = PTHREAD_MUTEX_INITIALIZER;
 
-void get_file_names(char*);
+pthread_mutex_t m_read = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t m_realloc = PTHREAD_MUTEX_INITIALIZER;
+int read_count = 0;
 
 void* read_file(void*);
+void get_file_names(char *directory_name);
 
 int main(int argc, char *argv[]) {
 
@@ -117,37 +119,30 @@ char* read_file_content(char *file_name) {
     return file_content;
 }
 
-int check_for_word(char *word) {
-    
-    for (int i = 0; i < unique_words_index; i++) {
-        if (!strcmp(word, unique_words[i]->word)) return i;
-    }
-
-    return -1;
-}
-
-void* read_file(void *arg) {
-
-    char *file_name;
-
-    pthread_mutex_lock(&m_file_index);
-
-    if (file_names[file_names_index] == NULL) {
-        pthread_mutex_unlock(&m_file_index);
-        pthread_exit(NULL);
-    }
-    else file_name = file_names[file_names_index++];
-
-    pthread_mutex_unlock(&m_file_index);
-    
-    printf("Thread %lu: Started processing file '%s'.\n", (unsigned long)pthread_self(), file_name);
+void* read_file(void *file_name) {
 
     char *file_content = read_file_content(file_name);
 
     char *buffer, *next = file_content;
 
-    while ((buffer = strtok_r(next, " \n", &next)) != NULL) {
-        int index = check_for_word(buffer);
+    while ((buffer = strtok_r(next, " ", &next)) != NULL) {
+        int index = -1;
+
+        pthread_mutex_lock(&m_read);
+        if (++read_count == 1) pthread_mutex_lock(&m_realloc);
+        pthread_mutex_unlock(&m_read);
+
+        for (int i = 0; i < unique_words_index; i++) {
+            if (unique_words[i] == NULL) break;
+            if (!strcmp(buffer, unique_words[i]->word)) {
+                index = i;
+                break;
+            }
+        }
+
+        pthread_mutex_lock(&m_read);
+        if (--read_count == 0) pthread_mutex_unlock(&m_realloc);
+        pthread_mutex_unlock(&m_read);
 
         if (index == -1) {
 
@@ -165,8 +160,13 @@ void* read_file(void *arg) {
             pthread_mutex_lock(&m_write_index);
 
             if (unique_words_index == unique_words_size) {
+                
+                pthread_mutex_lock(&m_realloc);
                 unique_words_size <<= 1;
                 unique_words = realloc(unique_words, sizeof(word_set*) * unique_words_size);
+                memset(unique_words + unique_words_index, 0, sizeof(word_set*) * (unique_words_size - unique_words_index));
+                pthread_mutex_unlock(&m_realloc);
+
                 printf("Thread %lu: Re-allocated array of %d pointers.\n", (unsigned long)pthread_self(), unique_words_size);
             }
 
