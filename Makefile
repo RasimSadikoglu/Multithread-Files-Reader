@@ -1,4 +1,4 @@
-OBJS=src/main.c src/pargser.c
+OBJS=src/main.c
 FLAGS=-Wall -Wextra -Wpedantic
 
 ./bin/main: ./bin $(OBJS)
@@ -8,7 +8,7 @@ FLAGS=-Wall -Wextra -Wpedantic
 	mkdir bin
 
 run: ./bin/main
-	./bin/main -d testdir -n 8
+	./bin/main -d testdir -n 256
 
 clean:
 	rm -rf bin
