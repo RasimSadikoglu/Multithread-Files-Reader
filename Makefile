@@ -8,7 +8,7 @@ FLAGS=-Wall -Wextra -Wpedantic
 	mkdir bin
 
 run: ./bin/main
-	./bin/main -d testdir -n 2
+	./bin/main -d testdir -n 16
 
 clean:
 	rm -rf bin
