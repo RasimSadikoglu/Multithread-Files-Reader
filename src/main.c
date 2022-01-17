@@ -59,6 +59,8 @@ int main(int argc, char *argv[]) {
         pthread_join(thread_pool[i], NULL);
     }
 
+    printf("MAIN THREAD: All done (successfully read %d words with %d threads from %d files)\n", unique_words_index, number_of_threads, file_names_index);
+
     for (int i = 0; i < unique_words_index; i++) {
         free(unique_words[i]->files);
         free(unique_words[i]->word);
@@ -119,13 +121,27 @@ char* read_file_content(char *file_name) {
     return file_content;
 }
 
-void* read_file(void *file_name) {
+void* read_file(void *arg) {
+
+    char *file_name;
+
+    pthread_mutex_lock(&m_file_index);
+
+    if (file_names[file_names_index] == NULL) {
+        pthread_mutex_unlock(&m_file_index);
+        pthread_exit(NULL);
+    }
+    else file_name = file_names[file_names_index++];
+
+    pthread_mutex_unlock(&m_file_index);
+    
+    printf("Thread %lu: Started processing file '%s'.\n", (unsigned long)pthread_self(), file_name);
 
     char *file_content = read_file_content(file_name);
 
     char *buffer, *next = file_content;
 
-    while ((buffer = strtok_r(next, " ", &next)) != NULL) {
+    while ((buffer = strtok_r(next, " \t\n", &next)) != NULL) {
         int index = -1;
 
         pthread_mutex_lock(&m_read);
